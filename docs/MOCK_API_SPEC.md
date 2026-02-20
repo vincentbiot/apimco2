@@ -32,18 +32,6 @@ Cette spécification décrit l'API mock destinée à simuler le backend de l'app
 | Tests automatisés | Vérifier le comportement des modules avec des données déterministes |
 | Démonstrations | Présenter l'application sans données réelles (secret statistique) |
 
-### 1.3 Configuration golem correspondante
-
-L'API mock s'intègre dans le profil `default` de `inst/golem-config.yml` :
-
-| Clé | Valeur |
-|---|---|
-| `plumber.URL` | `http://127.0.0.1` |
-| `plumber.port` | `1789` |
-| `plumber.proxy` | `""` |
-
-L'URL complète résultante est : `http://127.0.0.1:1789/{endpoint}`
-
 ---
 
 ## 2. Paramètres de requête communs
