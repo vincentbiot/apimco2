@@ -22,13 +22,13 @@
 
 ### 1.1 Objectif
 
-Cette spécification décrit l'API mock destinée à remplacer le backend Plumber/Impala de l'application Activité MCO lors du développement local, des tests automatisés et des démonstrations. L'API mock fournit des données fictives réalistes au format exact attendu par l'application Shiny.
+Cette spécification décrit l'API mock destinée à simuler le backend de l'application Activité MCO lors du développement local, des tests automatisés et des démonstrations. L'API mock fournit des données fictives réalistes au format exact attendu par l'application.
 
 ### 1.2 Contexte d'utilisation
 
 | Contexte | Description |
 |---|---|
-| Développement local | Développer l'interface sans accès au cluster Impala |
+| Développement local | Développer l'interface sans accès à la base de données |
 | Tests automatisés | Vérifier le comportement des modules avec des données déterministes |
 | Démonstrations | Présenter l'application sans données réelles (secret statistique) |
 
