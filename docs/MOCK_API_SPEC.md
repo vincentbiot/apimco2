@@ -36,7 +36,7 @@ Cette spécification décrit l'API mock destinée à simuler le backend de l'app
 
 ## 2. Paramètres de requête communs
 
-Tous les endpoints reçoivent un ensemble commun de paramètres via la query string HTTP. Ces paramètres sont construits par la fonction `get_query_api(config_selected)` dans `R/fct_query_impala.R`.
+Tous les endpoints reçoivent un ensemble commun de paramètres via la query string HTTP.
 
 ### 2.1 Paramètres de filtrage
 
@@ -91,9 +91,7 @@ Ces paramètres sont transmis à chaque requête pour l'identification et le tra
 - **Suppression si plage complète** : les paramètres représentant une plage complète sont envoyés à `NULL` (omis de la requête) pour optimiser le traitement côté serveur
 - **Codes CCAM** : format `AAAA000` (7 car.) ou `AAAA00000` (9 car. avec extension PMSI) ; extension `NA` → tronqué à 7 car.
 
-### 2.4 Paramètres additionnels par endpoint
-
-Ces paramètres sont ajoutés par les fonctions de récupération de données après `get_query_api()` :
+### 2.4 Paramètres additionnels par endpoints
 
 | Paramètre | Endpoint(s) | Valeur | Description |
 |---|---|---|---|
