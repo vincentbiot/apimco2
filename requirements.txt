@@ -1,0 +1,23 @@
+# Dépendances de l'API Mock Activité MCO
+# Chaque package est épinglé à une version majeure pour la stabilité.
+
+# Framework web ASGI
+fastapi==0.115.6
+
+# Serveur ASGI (lance l'application FastAPI)
+uvicorn[standard]==0.34.0
+
+# Validation des données (intégré à FastAPI, version 2 requise)
+pydantic==2.10.6
+
+# Client HTTP asynchrone — utilisé par FastAPI pour les tests
+httpx==0.28.1
+
+# Framework de tests
+pytest==8.3.5
+
+# Plugin pytest pour les coroutines async (utile avec httpx)
+pytest-asyncio==0.25.3
+
+# Linter et formateur de code
+ruff==0.9.6
