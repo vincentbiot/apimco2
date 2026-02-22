@@ -48,9 +48,19 @@
 
 from fastapi import FastAPI
 
-# Import du router de l'endpoint /resume.
-# À chaque nouvelle étape, on importera de nouveaux routers ici.
-from app.routers import resume
+# Import des routers — un module par endpoint.
+# Étape 4 : /resume (endpoint principal polyvalent)
+# Étape 5 : les 7 endpoints restants de la spec
+from app.routers import (
+    actes,
+    dernier_trans,
+    diag_assoc,
+    dmi_med,
+    resume,
+    resume_prec_annee,
+    tx_recours,
+    um,
+)
 
 # Instanciation de l'application FastAPI.
 # Les paramètres title, description et version alimentent la doc Swagger (/docs).
@@ -74,7 +84,18 @@ app = FastAPI(
 # On n'utilise pas de prefix ici car les routes déclarent leur chemin complet
 # directement dans le router (ex : @router.get("/resume")).
 # =============================================================================
+
+# Étape 4 — endpoint principal
 app.include_router(resume.router)
+
+# Étape 5 — les 7 endpoints restants (dans l'ordre croissant de complexité)
+app.include_router(dernier_trans.router)        # le plus simple : pas de var
+app.include_router(tx_recours.router)           # type_geo_tx_recours, pas de var
+app.include_router(resume_prec_annee.router)    # multi-année, similaire à /resume
+app.include_router(diag_assoc.router)           # code_diag (CIM-10) + var optionnel
+app.include_router(um.router)                   # code_rum + duree_moy_rum + var
+app.include_router(actes.router)                # code_ccam + colonnes CCAM spécifiques
+app.include_router(dmi_med.router)              # le plus complexe : mix med/dmi
 
 
 # =============================================================================
