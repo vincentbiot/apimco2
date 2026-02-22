@@ -138,7 +138,26 @@ def test_tx_recours_taux_positifs(client: TestClient):
 # Tests — paramètre `annee` obligatoire
 # ---------------------------------------------------------------------------
 
-def test_tx_recours_sans_annee_retourne_422(client: TestClient):
-    """Sans le paramètre `annee` obligatoire, l'API retourne 422."""
+def test_tx_recours_sans_annee_retourne_400(client: TestClient) -> None:
+    """Sans le paramètre `annee` obligatoire, l'API retourne 400 (étape 6 : handler 422→400)."""
     response = client.get("/tx_recours")
-    assert response.status_code == 422
+    assert response.status_code == 400
+
+
+# =============================================================================
+# Tests étape 6 — Gestion des erreurs
+# =============================================================================
+
+
+def test_tx_recours_404_perimetre_vide(client: TestClient) -> None:
+    """
+    simulate_vide=TRUE doit retourner HTTP 404 (spec §5.1).
+
+    Note : /tx_recours n'est pas soumis au petit_effectif (taux géographiques).
+    """
+    response = client.get(
+        "/tx_recours",
+        params={"annee": "23", "simulate_vide": "TRUE"},
+    )
+    assert response.status_code == 404
+    assert "detail" in response.json()

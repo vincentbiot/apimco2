@@ -84,16 +84,58 @@ def test_dernier_trans_finess_uniques(client: TestClient):
 # Tests — paramètre `annee` obligatoire
 # ---------------------------------------------------------------------------
 
-def test_dernier_trans_sans_annee_retourne_422(client: TestClient):
-    """Sans le paramètre `annee` obligatoire, l'API retourne 422."""
+def test_dernier_trans_sans_annee_retourne_400(client: TestClient) -> None:
+    """Sans le paramètre `annee` obligatoire, l'API retourne 400 (étape 6 : handler 422→400)."""
     response = client.get("/dernier_trans")
-    assert response.status_code == 422
+    assert response.status_code == 400
 
 
-def test_dernier_trans_annee_differente(client: TestClient):
+def test_dernier_trans_annee_differente(client: TestClient) -> None:
     """Avec une année différente, l'annee 4 chiffres est correctement calculée."""
     response = client.get("/dernier_trans", params={"annee": "19"})
     assert response.status_code == 200
     data = response.json()
     for row in data:
         assert row["annee"] == 2019, f"Attendu 2019, obtenu {row['annee']}"
+
+
+# =============================================================================
+# Tests étape 6 — Gestion des erreurs
+# =============================================================================
+
+
+def test_dernier_trans_404_perimetre_vide(client: TestClient) -> None:
+    """
+    simulate_vide=TRUE doit retourner HTTP 404 (spec §5.1).
+
+    Note : /dernier_trans est EXEMPT du petit_effectif (données administratives,
+    spec §3.8). Seul le 404 est testé ici.
+    """
+    response = client.get(
+        "/dernier_trans",
+        params={"annee": "23", "simulate_vide": "TRUE"},
+    )
+    assert response.status_code == 404
+    assert "detail" in response.json()
+
+
+def test_dernier_trans_exempt_petit_effectif(client: TestClient) -> None:
+    """
+    /dernier_trans ignore simulate_petit_effectif (exempt du secret statistique).
+
+    La spec §3.8 dit explicitement que cet endpoint est exclu du contrôle
+    petit_effectif car il s'agit de données administratives (dates de transmission).
+    Avec simulate_petit_effectif=TRUE, la réponse est normale (pas de Méthode B).
+    """
+    response = client.get(
+        "/dernier_trans",
+        params={"annee": "23", "simulate_petit_effectif": "TRUE"},
+    )
+    # Doit retourner 200 avec des données normales (ignorer le paramètre)
+    assert response.status_code == 200
+    data = response.json()
+    # La réponse complète avec les 7 établissements (pas une réponse petit_effectif)
+    assert len(data) == 7
+    # Les colonnes numériques doivent être présentes (annee est un entier)
+    for row in data:
+        assert isinstance(row["annee"], int)

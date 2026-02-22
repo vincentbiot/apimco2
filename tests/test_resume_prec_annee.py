@@ -104,7 +104,45 @@ def test_resume_prec_annee_annee_valide_dans_var(client: TestClient):
 # Tests — paramètre `annee` obligatoire
 # ---------------------------------------------------------------------------
 
-def test_resume_prec_annee_sans_annee_retourne_422(client: TestClient):
-    """Sans le paramètre `annee` obligatoire, l'API retourne 422."""
+def test_resume_prec_annee_sans_annee_retourne_400(client: TestClient) -> None:
+    """Sans le paramètre `annee` obligatoire, l'API retourne 400 (étape 6 : handler 422→400)."""
     response = client.get("/resume_prec_annee")
-    assert response.status_code == 422
+    assert response.status_code == 400
+
+
+# =============================================================================
+# Tests étape 6 — Gestion des erreurs et secret statistique
+# =============================================================================
+
+
+def test_resume_prec_annee_404_perimetre_vide(client: TestClient) -> None:
+    """simulate_vide=TRUE doit retourner HTTP 404 (spec §5.1)."""
+    response = client.get(
+        "/resume_prec_annee",
+        params={"annee": "23", "simulate_vide": "TRUE"},
+    )
+    assert response.status_code == 404
+    assert "detail" in response.json()
+
+
+def test_resume_prec_annee_petit_effectif_methode_b(client: TestClient) -> None:
+    """
+    simulate_petit_effectif=TRUE retourne la Méthode B (spec §5.2).
+
+    Une seule ligne avec uniquement des colonnes string (pas de colonnes numériques).
+    Le client R détecte ce cas via : all(sapply(data, function(col) !any(is.numeric(col))))
+    """
+    response = client.get(
+        "/resume_prec_annee",
+        params={"annee": "23", "simulate_petit_effectif": "TRUE"},
+    )
+    assert response.status_code == 200
+
+    data = response.json()
+    # Une seule ligne
+    assert len(data) == 1
+
+    # La ligne ne doit contenir que des colonnes string (aucune numérique)
+    row = data[0]
+    for value in row.values():
+        assert isinstance(value, str), f"Valeur non-string trouvée : {value!r}"

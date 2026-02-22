@@ -16,9 +16,10 @@
 #   is_classant : 1 si l'acte est classant (détermine le GHM), 0 sinon
 # =============================================================================
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import JSONResponse
 
-from app.generators.mock_data import generate_actes_rows
+from app.generators.mock_data import build_petit_effectif_row_b, generate_actes_rows
 from app.models.params import CommonQueryParams
 from app.models.responses import ActesRow
 
@@ -66,4 +67,18 @@ def get_actes(
     - Si `"dr"` est dans `flex_param`, `verif_data(result, "dr")` est aussi appelé.
     - Le module enrichit `code_ccam` avec le libellé depuis `df_ccam`.
     """
+    # Simulation 404 — périmètre vide (spec §5.1)
+    if params.simulate_vide is not None and params.simulate_vide.upper() == "TRUE":
+        raise HTTPException(
+            status_code=404,
+            detail="Aucun séjour ne correspond aux critères de filtrage.",
+        )
+
+    # Simulation petit effectif — Méthode B (spec §5.2)
+    if (
+        params.simulate_petit_effectif is not None
+        and params.simulate_petit_effectif.upper() == "TRUE"
+    ):
+        return JSONResponse(content=build_petit_effectif_row_b("code_ccam", "DZQM006"))
+
     return generate_actes_rows(var=params.var)

@@ -59,14 +59,19 @@ def test_health(client: TestClient) -> None:
 
 def test_resume_annee_obligatoire(client: TestClient) -> None:
     """
-    Sans le paramètre annee, l'API doit retourner HTTP 422 (Unprocessable Entity).
+    Sans le paramètre annee, l'API doit retourner HTTP 400 (Bad Request).
 
-    422 est le code standard de FastAPI quand un paramètre obligatoire est absent
-    ou invalide. Le corps de la réponse contient un tableau "detail" qui décrit
-    les erreurs de validation.
+    Étape 6 — HTTPException et exception handlers :
+    FastAPI retourne 422 (Unprocessable Entity) par défaut pour les erreurs de
+    validation. Un handler personnalisé dans app/main.py convertit ce 422 en 400
+    (Bad Request) pour correspondre à la spec MCO §5.1.
+
+    Le corps de la réponse conserve le format FastAPI :
+        {"detail": [{"loc": [...], "msg": "...", "type": "..."}]}
     """
     response = client.get("/resume")
-    assert response.status_code == 422
+    # L'exception handler de main.py convertit 422 → 400
+    assert response.status_code == 400
 
     # Vérifier que le message d'erreur mentionne le paramètre "annee"
     detail = response.json()["detail"]
@@ -77,15 +82,18 @@ def test_resume_annee_obligatoire(client: TestClient) -> None:
 
 def test_resume_annee_format_invalide(client: TestClient) -> None:
     """
-    annee doit être exactement 2 chiffres. Un format invalide doit retourner 422.
+    annee doit être exactement 2 chiffres. Un format invalide doit retourner 400.
+
+    Étape 6 : La validation du pattern ^\\d{2}$ dans CommonQueryParams lève une
+    RequestValidationError, convertie en 400 par l'exception handler.
     """
     # 4 chiffres → invalide (pattern ^\d{2}$ ne matche pas)
     response = client.get("/resume", params={"annee": "2023"})
-    assert response.status_code == 422
+    assert response.status_code == 400
 
     # Lettre → invalide
     response = client.get("/resume", params={"annee": "ab"})
-    assert response.status_code == 422
+    assert response.status_code == 400
 
 
 # =============================================================================
@@ -389,6 +397,87 @@ def test_resume_parametres_filtrage_ignores(client: TestClient) -> None:
             "moissortie": "1_6",
         },
     )
-    # Les paramètres de filtrage sont acceptés (pas d'erreur 422)
+    # Les paramètres de filtrage sont acceptés (pas d'erreur 400)
     assert response.status_code == 200
     assert len(response.json()) > 0
+
+
+# =============================================================================
+# Tests étape 6 — Gestion des erreurs et secret statistique
+# =============================================================================
+
+
+def test_resume_404_perimetre_vide(client: TestClient) -> None:
+    """
+    simulate_vide=TRUE doit retourner HTTP 404.
+
+    Étape 6 — HTTPException :
+    Simule le cas réel où le filtre ne correspond à aucun séjour.
+    Le client R reçoit 404 et affiche un message "aucun résultat".
+
+    Doc : https://fastapi.tiangolo.com/tutorial/handling-errors/
+    """
+    response = client.get(
+        "/resume",
+        params={"annee": "23", "simulate_vide": "TRUE"},
+    )
+    assert response.status_code == 404
+
+    # Le corps de la réponse doit contenir un message explicatif
+    body = response.json()
+    assert "detail" in body
+
+
+def test_resume_petit_effectif_methode_a(client: TestClient) -> None:
+    """
+    simulate_petit_effectif=TRUE avec bool_nb_pat=TRUE retourne la Méthode A.
+
+    Étape 6 — Secret statistique (spec §5.2 Méthode A) :
+    Quand le périmètre contient < 10 séjours et que bool_nb_pat=TRUE est fourni,
+    la colonne nb_pat doit contenir la chaîne "petit_effectif" (pas un entier).
+
+    Format attendu :
+        [{"nb_sej": 5, "nb_pat": "petit_effectif", "duree_moy_sej": ..., ...}]
+    """
+    response = client.get(
+        "/resume",
+        params={
+            "annee": "23",
+            "bool_nb_pat": "TRUE",
+            "simulate_petit_effectif": "TRUE",
+        },
+    )
+    assert response.status_code == 200
+
+    data = response.json()
+    assert len(data) == 1
+    row = data[0]
+
+    # nb_sej doit être un petit nombre (< 10)
+    assert "nb_sej" in row
+    assert row["nb_sej"] < 10
+
+    # nb_pat doit être la chaîne "petit_effectif" (pas un entier)
+    assert "nb_pat" in row
+    assert row["nb_pat"] == "petit_effectif"
+    assert isinstance(row["nb_pat"], str)
+
+
+def test_resume_petit_effectif_sans_bool_nb_pat(client: TestClient) -> None:
+    """
+    simulate_petit_effectif=TRUE SANS bool_nb_pat=TRUE n'active PAS la Méthode A.
+
+    La Méthode A ne s'applique qu'avec bool_nb_pat=TRUE. Sans ce paramètre,
+    l'endpoint retourne des données normales (sans nb_pat du tout).
+    """
+    response = client.get(
+        "/resume",
+        params={"annee": "23", "simulate_petit_effectif": "TRUE"},
+    )
+    assert response.status_code == 200
+
+    data = response.json()
+    # Réponse normale (1 ligne agrégée, pas de petit_effectif)
+    assert len(data) == 1
+    # Sans bool_nb_pat, nb_pat ne doit pas être présent
+    assert "nb_pat" not in data[0]

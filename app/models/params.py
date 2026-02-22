@@ -340,6 +340,38 @@ class CommonQueryParams:
                 "à la réponse. Voir la spec §4 pour la liste complète."
             ),
         ),
+        # -------------------------------------------------------------------------
+        # PARAMÈTRES DE SIMULATION — Étape 6 (gestion des erreurs et petit_effectif)
+        #
+        # Ces paramètres sont propres au mock : ils permettent de tester les cas
+        # limites définis dans la spec §5 sans avoir à construire des périmètres
+        # de filtrage très restrictifs.
+        #
+        # simulate_vide=TRUE     → simule un périmètre vide (aucun séjour trouvé)
+        #                          → l'API retourne HTTP 404
+        #
+        # simulate_petit_effectif=TRUE → simule un petit effectif (< 10 séjours)
+        #                          → déclenche la protection du secret statistique
+        #                          → spec §5.2 Méthode A (pour /resume + bool_nb_pat)
+        #                            ou Méthode B (pour les autres endpoints stat)
+        # -------------------------------------------------------------------------
+        simulate_vide: str | None = Query(
+            None,
+            description=(
+                "**Mock uniquement.** Simule un périmètre de filtrage vide "
+                "(aucun séjour ne correspond aux critères). "
+                "Valeur : 'TRUE'. Retourne HTTP 404."
+            ),
+        ),
+        simulate_petit_effectif: str | None = Query(
+            None,
+            description=(
+                "**Mock uniquement.** Simule un petit effectif (< 10 séjours). "
+                "Valeur : 'TRUE'. Déclenche la protection du secret statistique "
+                "(spec §5.2) : Méthode A sur /resume avec bool_nb_pat=TRUE, "
+                "Méthode B sur les autres endpoints statistiques."
+            ),
+        ),
     ):
         # --- Paramètre obligatoire ---
         self.annee = annee
@@ -409,3 +441,7 @@ class CommonQueryParams:
 
         # --- Ventilation ---
         self.var = var
+
+        # --- Simulation (mock uniquement) ---
+        self.simulate_vide = simulate_vide
+        self.simulate_petit_effectif = simulate_petit_effectif

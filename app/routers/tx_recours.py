@@ -14,7 +14,7 @@
 #   Doc : https://fastapi.tiangolo.com/tutorial/query-params-str-validations/
 # =============================================================================
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.generators.mock_data import generate_tx_recours_rows
 from app.models.params import CommonQueryParams
@@ -75,4 +75,13 @@ def get_tx_recours(
     Le module filtre `!is.na(code)` et effectue une jointure avec la carte
     géographique (`cartes[[type_rgp]]`) via le champ `codgeo`.
     """
+    # Simulation 404 — périmètre vide (spec §5.1)
+    # Note : /tx_recours n'est pas soumis au petit_effectif (taux géographiques,
+    # pas de secret statistique au niveau population).
+    if params.simulate_vide is not None and params.simulate_vide.upper() == "TRUE":
+        raise HTTPException(
+            status_code=404,
+            detail="Aucun séjour ne correspond aux critères de filtrage.",
+        )
+
     return generate_tx_recours_rows(type_geo=type_geo_tx_recours)

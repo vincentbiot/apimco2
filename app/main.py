@@ -47,6 +47,9 @@
 # =============================================================================
 
 from fastapi import FastAPI
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
+from starlette.requests import Request
 
 # Import des routers — un module par endpoint.
 # Étape 4 : /resume (endpoint principal polyvalent)
@@ -62,6 +65,45 @@ from app.routers import (
     um,
 )
 
+# =============================================================================
+# Concepts FastAPI introduits à l'étape 6 — Gestion des erreurs
+#
+#   5. HTTPException
+#      Permet de lever manuellement une réponse d'erreur HTTP depuis n'importe
+#      quelle fonction d'endpoint ou de dépendance.
+#
+#      Exemple :
+#        from fastapi import HTTPException
+#        raise HTTPException(status_code=404, detail="Aucun séjour trouvé")
+#
+#      FastAPI intercepte l'exception et retourne une réponse JSON :
+#        {"detail": "Aucun séjour trouvé"} avec le code HTTP 404.
+#
+#      Doc : https://fastapi.tiangolo.com/tutorial/handling-errors/
+#
+#   6. @app.exception_handler() — Exception handlers personnalisés
+#      Permet de remplacer le comportement par défaut de FastAPI pour certaines
+#      exceptions. La fonction décorée reçoit la requête et l'exception, et
+#      doit retourner une Response.
+#
+#      Cas d'usage ici : RequestValidationError (levée par FastAPI quand un
+#      paramètre obligatoire est absent ou invalide) retourne 422 par défaut.
+#      La spec MCO attend un 400 (Bad Request). On surcharge ce comportement
+#      avec un handler personnalisé.
+#
+#      La fonction handler DOIT être async (coroutine) car FastAPI l'appelle
+#      dans son boucle d'événements asyncio.
+#
+#      Doc : https://fastapi.tiangolo.com/tutorial/handling-errors/#install-custom-exception-handlers
+#
+#   7. RequestValidationError
+#      Exception Pydantic/Starlette levée quand la validation des paramètres
+#      d'entrée échoue (paramètre manquant, type incorrect, pattern non respecté).
+#      Par défaut FastAPI la convertit en HTTP 422. Ici on la convertit en 400.
+#
+#      Doc : https://fastapi.tiangolo.com/tutorial/handling-errors/#requestvalidationerror-vs-validationerror
+# =============================================================================
+
 # Instanciation de l'application FastAPI.
 # Les paramètres title, description et version alimentent la doc Swagger (/docs).
 app = FastAPI(
@@ -72,6 +114,40 @@ app = FastAPI(
     ),
     version="0.1.0",
 )
+
+
+# =============================================================================
+# Exception handler — Conversion 422 → 400 pour les erreurs de validation
+#
+# FastAPI retourne HTTP 422 (Unprocessable Entity) par défaut quand un paramètre
+# obligatoire est absent ou invalide (RequestValidationError).
+#
+# La spec MCO §5.1 attend HTTP 400 (Bad Request) pour ces cas.
+# On installe un handler personnalisé qui intercepte RequestValidationError
+# et retourne 400 avec le même corps JSON que le 422 natif.
+#
+# Note : ce handler s'applique à TOUS les endpoints de l'application.
+# Les clients qui lisent uniquement le status_code recevront 400.
+# =============================================================================
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(
+    request: Request, exc: RequestValidationError
+) -> JSONResponse:
+    """
+    Transforme les erreurs de validation Pydantic (paramètres manquants ou invalides)
+    en réponse HTTP 400 au lieu du 422 par défaut de FastAPI.
+
+    Le corps de la réponse conserve le format natif FastAPI :
+        {"detail": [{"loc": [...], "msg": "...", "type": "..."}]}
+    """
+    # exc.errors() retourne la liste des erreurs de validation Pydantic.
+    # Elle contient pour chaque erreur : loc (localisation), msg (message), type.
+    return JSONResponse(
+        status_code=400,
+        content={"detail": exc.errors()},
+    )
 
 
 # =============================================================================
