@@ -45,12 +45,30 @@
 #   4. FastAPI sérialise la liste de dicts en JSON et retourne HTTP 200
 # =============================================================================
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import JSONResponse
 
 from app.generators.mock_data import generate_resume_rows, parse_var
 from app.models.params import CommonQueryParams
 from app.models.responses import ResumeRow
+
+# -----------------------------------------------------------------------------
+# Concept FastAPI — HTTPException (étape 6)
+#
+# HTTPException est l'outil standard pour retourner une erreur HTTP depuis
+# un endpoint. On l'importe depuis fastapi et on l'utilise avec raise.
+#
+# Syntaxe :
+#   raise HTTPException(status_code=404, detail="Aucun séjour trouvé")
+#
+# FastAPI intercepte l'exception et retourne automatiquement :
+#   HTTP 404  {"detail": "Aucun séjour trouvé"}
+#
+# Le paramètre detail peut être une chaîne, un dict ou n'importe quel objet
+# JSON-sérialisable. Il apparaît dans le corps de la réponse.
+#
+# Doc : https://fastapi.tiangolo.com/tutorial/handling-errors/
+# -----------------------------------------------------------------------------
 
 # -----------------------------------------------------------------------------
 # Création du router
@@ -136,10 +154,59 @@ def get_resume(
     Si `bool_nb_pat=TRUE` et effectif < 10, `nb_pat` contient la chaîne
     `"petit_effectif"` au lieu d'un entier (spec §5.2 méthode A).
     """
+    # -------------------------------------------------------------------------
+    # Simulation 404 — périmètre vide (aucun séjour)
+    #
+    # Si simulate_vide="TRUE", on lève une HTTPException avec status_code=404.
+    # Cela simule le cas réel où le filtre (GHM, FINESS, âge...) est trop
+    # restrictif et ne correspond à aucun séjour dans la base.
+    #
+    # Le client R (`call_api_and_unwrap()`) lit le status_code et retourne
+    # l'entier 404 au lieu d'un data.frame. Le module appelant affiche
+    # alors un message "aucun résultat".
+    # -------------------------------------------------------------------------
+    if params.simulate_vide is not None and params.simulate_vide.upper() == "TRUE":
+        raise HTTPException(
+            status_code=404,
+            detail="Aucun séjour ne correspond aux critères de filtrage.",
+        )
+
     # Convertir bool_nb_pat de str en bool Python.
     # Le client R envoie la chaîne "TRUE" (et non True ou 1).
     # On considère que toute valeur absente ou différente de "TRUE" → False.
     include_nb_pat: bool = bool_nb_pat is not None and bool_nb_pat.upper() == "TRUE"
+
+    # -------------------------------------------------------------------------
+    # Simulation petit effectif — Méthode A (spec §5.2)
+    #
+    # La Méthode A s'applique uniquement à /resume avec bool_nb_pat=TRUE.
+    # Quand l'effectif est < 10 séjours, nb_pat ne peut pas être divulgué :
+    # la colonne contient la chaîne "petit_effectif" au lieu d'un entier.
+    #
+    # Le client R détecte ce cas via :
+    #   if (is.character(data$nb_pat)) { ... # affiche avertissement }
+    #
+    # Dans le mock, on simule ce cas avec simulate_petit_effectif=TRUE.
+    # On génère une ligne avec nb_sej < 10 et nb_pat = "petit_effectif".
+    # -------------------------------------------------------------------------
+    simulate_pe: bool = (
+        params.simulate_petit_effectif is not None
+        and params.simulate_petit_effectif.upper() == "TRUE"
+    )
+    if simulate_pe and include_nb_pat and params.var is None:
+        # Retour Méthode A : nb_sej faible, nb_pat = chaîne "petit_effectif"
+        return JSONResponse(
+            content=[
+                {
+                    "nb_sej": 5,
+                    "nb_pat": "petit_effectif",
+                    "duree_moy_sej": 3.2,
+                    "tx_dc": 0.0,
+                    "tx_male": 0.6,
+                    "age_moy": 45.3,
+                }
+            ]
+        )
 
     # Déléguer la génération de données au module generators/mock_data.py.
     # On passe :

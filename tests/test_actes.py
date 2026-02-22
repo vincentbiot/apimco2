@@ -130,7 +130,44 @@ def test_actes_avec_var_plus_de_lignes(client: TestClient):
 # Tests — paramètre `annee` obligatoire
 # ---------------------------------------------------------------------------
 
-def test_actes_sans_annee_retourne_422(client: TestClient):
-    """Sans le paramètre `annee` obligatoire, l'API retourne 422."""
+def test_actes_sans_annee_retourne_400(client: TestClient) -> None:
+    """Sans le paramètre `annee` obligatoire, l'API retourne 400 (étape 6 : handler 422→400)."""
     response = client.get("/actes")
-    assert response.status_code == 422
+    assert response.status_code == 400
+
+
+# =============================================================================
+# Tests étape 6 — Gestion des erreurs et secret statistique
+# =============================================================================
+
+
+def test_actes_404_perimetre_vide(client: TestClient) -> None:
+    """simulate_vide=TRUE doit retourner HTTP 404 (spec §5.1)."""
+    response = client.get(
+        "/actes",
+        params={"annee": "23", "simulate_vide": "TRUE"},
+    )
+    assert response.status_code == 404
+    assert "detail" in response.json()
+
+
+def test_actes_petit_effectif_methode_b(client: TestClient) -> None:
+    """
+    simulate_petit_effectif=TRUE retourne la Méthode B (spec §5.2).
+
+    Une seule ligne avec uniquement des colonnes string (pas de colonnes numériques).
+    """
+    response = client.get(
+        "/actes",
+        params={"annee": "23", "simulate_petit_effectif": "TRUE"},
+    )
+    assert response.status_code == 200
+
+    data = response.json()
+    assert len(data) == 1
+
+    row = data[0]
+    # La ligne identifiant doit être "code_ccam"
+    assert "code_ccam" in row
+    for value in row.values():
+        assert isinstance(value, str), f"Valeur non-string trouvée : {value!r}"

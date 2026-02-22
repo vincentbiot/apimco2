@@ -1146,3 +1146,43 @@ def generate_dmi_med_rows(
         rows = rows[:max_rows]
 
     return rows
+
+
+# =============================================================================
+# SECRET STATISTIQUE — Méthode B (étape 6)
+# =============================================================================
+
+
+def build_petit_effectif_row_b(identifier_col: str, identifier_val: str) -> list[dict]:
+    """
+    Génère la réponse "petit effectif" pour les endpoints soumis à la Méthode B
+    du secret statistique (spec §5.2).
+
+    Quand un périmètre concerne moins de 10 séjours, l'API ne peut pas retourner
+    de statistiques (secret statistique PMSI). Pour les endpoints autres que
+    /resume, la convention est de retourner un tableau contenant UNE SEULE LIGNE
+    avec uniquement des colonnes de type chaîne de caractères (aucune colonne
+    numérique).
+
+    Le client R détecte ce cas via :
+        all(sapply(config_data, function(col) !any(is.numeric(col))))
+    Si toutes les colonnes sont non-numériques → petit effectif détecté.
+
+    Args:
+        identifier_col: nom de la colonne identifiant de l'endpoint
+                        (ex : "code_ccam" pour /actes, "code_diag" pour /diag_assoc)
+        identifier_val: valeur string représentative pour cette colonne
+
+    Returns:
+        Liste avec une seule ligne tout-string, ex : [{"code_ccam": "DZQM006"}]
+
+    Exemples d'appel par endpoint :
+        /resume_prec_annee  → build_petit_effectif_row_b("annee", "2023")
+        /diag_assoc         → build_petit_effectif_row_b("code_diag", "I10")
+        /um                 → build_petit_effectif_row_b("code_rum", "01")
+        /actes              → build_petit_effectif_row_b("code_ccam", "DZQM006")
+        /dmi_med            → build_petit_effectif_row_b("datasource", "med")
+    """
+    # Une seule ligne, une seule colonne string.
+    # Aucune valeur numérique → le client R détecte le petit effectif.
+    return [{identifier_col: identifier_val}]

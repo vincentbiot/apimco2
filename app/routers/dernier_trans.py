@@ -14,7 +14,7 @@
 #   Doc : https://fastapi.tiangolo.com/tutorial/path-operation-configuration/#tags
 # =============================================================================
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 
 from app.generators.mock_data import generate_dernier_trans_rows
 from app.models.params import CommonQueryParams
@@ -56,5 +56,14 @@ def get_dernier_trans(
     | `categ` | Catégorie : `"CH"`, `"CL"`, etc. |
     | `derniere_transmission` | Date au format `"YYYY-MM-DD"` |
     """
-    # Appel direct au générateur — pas de var, pas de logique conditionnelle
+    # Simulation 404 — périmètre vide (spec §5.1)
+    # Note : /dernier_trans est EXEMPT du petit_effectif (données administratives,
+    # spec §3.8). Seul le 404 est géré ici.
+    if params.simulate_vide is not None and params.simulate_vide.upper() == "TRUE":
+        raise HTTPException(
+            status_code=404,
+            detail="Aucun établissement ne correspond aux critères de filtrage.",
+        )
+
+    # Appel direct au générateur — pas de var, pas de logique petit_effectif
     return generate_dernier_trans_rows(annee_param=params.annee)

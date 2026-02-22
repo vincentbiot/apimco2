@@ -15,9 +15,10 @@
 #   dans la même section de la doc Swagger (/docs).
 # =============================================================================
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import JSONResponse
 
-from app.generators.mock_data import generate_diag_assoc_rows
+from app.generators.mock_data import build_petit_effectif_row_b, generate_diag_assoc_rows
 from app.models.params import CommonQueryParams
 from app.models.responses import DiagAssocRow
 
@@ -62,4 +63,18 @@ def get_diag_assoc(
     - `verif_data(result, "duree_moy_sej")` est appelé après réception.
     - Si `"dr"` est dans `flex_param`, `verif_data(result, "dr")` est aussi appelé.
     """
+    # Simulation 404 — périmètre vide (spec §5.1)
+    if params.simulate_vide is not None and params.simulate_vide.upper() == "TRUE":
+        raise HTTPException(
+            status_code=404,
+            detail="Aucun séjour ne correspond aux critères de filtrage.",
+        )
+
+    # Simulation petit effectif — Méthode B (spec §5.2)
+    if (
+        params.simulate_petit_effectif is not None
+        and params.simulate_petit_effectif.upper() == "TRUE"
+    ):
+        return JSONResponse(content=build_petit_effectif_row_b("code_diag", "I10"))
+
     return generate_diag_assoc_rows(var=params.var)
