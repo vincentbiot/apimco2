@@ -1,0 +1,71 @@
+# =============================================================================
+# docker-compose.yml — Orchestration locale de l'API Mock MCO
+#
+# Docker Compose permet de déclarer et lancer plusieurs services avec
+# une seule commande : docker compose up
+#
+# Pour ce projet, un seul service est défini : l'API FastAPI.
+# Si le projet évoluait pour inclure une base de données ou un proxy,
+# on ajouterait des services supplémentaires dans ce fichier.
+#
+# Commandes utiles :
+#   docker compose up --build        # Construire l'image et démarrer
+#   docker compose up -d             # Démarrer en arrière-plan (detached)
+#   docker compose down              # Arrêter et supprimer les conteneurs
+#   docker compose logs -f           # Suivre les logs en temps réel
+#   docker compose exec api bash     # Ouvrir un shell dans le conteneur
+#   docker compose run api pytest    # Lancer les tests dans le conteneur
+# =============================================================================
+
+services:
+
+  # ---------------------------------------------------------------------------
+  # Service principal : API Mock MCO
+  # ---------------------------------------------------------------------------
+  api:
+    # Nom de l'image Docker construite localement.
+    # "apimco2" est le nom de l'image ; ":latest" est le tag (version).
+    image: apimco2:latest
+
+    # build.context : répertoire racine utilisé pour construire l'image.
+    # "." signifie le répertoire courant (là où docker-compose.yml est situé).
+    # Docker enverra ce répertoire au daemon Docker pour le build.
+    build:
+      context: .
+      dockerfile: Dockerfile
+
+    # Nom du conteneur créé (optionnel, utile pour les logs et docker exec).
+    container_name: apimco2-api
+
+    # Mapping de port : <port_hôte>:<port_conteneur>
+    # Après "docker compose up", l'API est accessible à http://localhost:8000
+    ports:
+      - "8000:8000"
+
+    # Variables d'environnement chargées depuis le fichier .env.
+    # Si .env n'existe pas, Docker utilise les valeurs par défaut de l'app.
+    # Copier .env.example → .env et personnaliser avant de lancer.
+    env_file:
+      - path: .env
+        required: false   # ne pas échouer si .env est absent
+
+    # Variables d'environnement supplémentaires (surchargent le .env).
+    # Ces valeurs sont adaptées au contexte Docker (pas de rechargement auto).
+    environment:
+      - ENVIRONMENT=production
+
+    # Politique de redémarrage :
+    #   unless-stopped → redémarre automatiquement si le conteneur plante,
+    #   mais pas si on l'arrête manuellement avec "docker compose down".
+    restart: unless-stopped
+
+    # Vérification de l'état du service (healthcheck).
+    # Docker interroge l'endpoint GET / toutes les 30 secondes.
+    # Si 3 vérifications consécutives échouent, le conteneur est marqué "unhealthy".
+    healthcheck:
+      test: ["CMD", "python", "-c",
+             "import urllib.request; urllib.request.urlopen('http://localhost:8000/')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s

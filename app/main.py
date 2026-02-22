@@ -46,10 +46,18 @@
 # Doc Swagger générée automatiquement : http://localhost:8000/docs
 # =============================================================================
 
+import logging
+import random
+from contextlib import asynccontextmanager
+from typing import AsyncGenerator
+
 from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from starlette.requests import Request
+
+from app.config import settings
 
 # Import des routers — un module par endpoint.
 # Étape 4 : /resume (endpoint principal polyvalent)
@@ -64,6 +72,79 @@ from app.routers import (
     tx_recours,
     um,
 )
+
+# Création d'un logger pour ce module.
+# logging.getLogger(__name__) crée (ou récupère) un logger nommé d'après
+# le module courant ("app.main"). C'est la convention Python recommandée.
+logger = logging.getLogger(__name__)
+
+
+# =============================================================================
+# Concept FastAPI — Lifespan events (étape 7)
+#
+#   Le paramètre lifespan de FastAPI() permet d'enregistrer du code à exécuter
+#   au DÉMARRAGE et à l'ARRÊT de l'application, via un gestionnaire de contexte
+#   asynchrone (asynccontextmanager).
+#
+#   Structure :
+#     @asynccontextmanager
+#     async def lifespan(app: FastAPI) -> AsyncGenerator:
+#         # Code de démarrage (startup) — exécuté avant d'accepter les requêtes
+#         yield
+#         # Code d'arrêt (shutdown) — exécuté après la fermeture du serveur
+#
+#   Avantage par rapport aux anciens @app.on_event("startup"/"shutdown") :
+#   Cette approche est recommandée depuis FastAPI 0.93+ car elle est plus
+#   propre et compatible avec les tests.
+#
+#   Cas d'usage typiques :
+#     - Initialiser une connexion à la base de données au démarrage
+#     - Libérer les ressources (connexions, fichiers) à l'arrêt
+#     - Fixer un seed aléatoire global (notre cas ici)
+#
+#   Doc : https://fastapi.tiangolo.com/advanced/events/
+# =============================================================================
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncGenerator:
+    """
+    Gestionnaire de cycle de vie de l'application.
+
+    Startup : configure le générateur aléatoire selon le RANDOM_SEED configuré.
+    Shutdown : rien à faire pour ce projet (pas de connexion DB à fermer).
+    """
+    # --- Startup ---
+    if settings.random_seed is not None:
+        # Fixe le seed global du module random.
+        # Conséquence : toutes les données mock générées seront identiques
+        # d'un démarrage à l'autre, tant que le seed est le même.
+        # Utile pour les démos reproductibles et les tests d'intégration.
+        random.seed(settings.random_seed)
+        logger.info(
+            "Seed aléatoire fixé à %d (données mock déterministes)",
+            settings.random_seed,
+        )
+    else:
+        logger.info(
+            "Aucun seed configuré — données mock aléatoires à chaque appel "
+            "(définir RANDOM_SEED dans .env pour des données déterministes)"
+        )
+
+    logger.info(
+        "API Mock MCO démarrée — environnement=%s, port=%d, CORS=%s",
+        settings.environment,
+        settings.port,
+        settings.cors_origins,
+    )
+
+    # `yield` sépare startup et shutdown.
+    # L'application accepte les requêtes entre le yield et la fin du bloc.
+    yield
+
+    # --- Shutdown ---
+    logger.info("API Mock MCO arrêtée.")
+
 
 # =============================================================================
 # Concepts FastAPI introduits à l'étape 6 — Gestion des erreurs
@@ -106,6 +187,7 @@ from app.routers import (
 
 # Instanciation de l'application FastAPI.
 # Les paramètres title, description et version alimentent la doc Swagger (/docs).
+# Le paramètre lifespan connecte notre gestionnaire de cycle de vie.
 app = FastAPI(
     title="API Mock Activité MCO",
     description=(
@@ -113,6 +195,45 @@ app = FastAPI(
         "Permet de développer et tester des clients R sans connexion à la base PMSI réelle."
     ),
     version="0.1.0",
+    lifespan=lifespan,
+)
+
+
+# =============================================================================
+# Concept FastAPI — CORSMiddleware (étape 7)
+#
+#   CORS (Cross-Origin Resource Sharing) est un mécanisme de sécurité des
+#   navigateurs. Quand une application web (ex : Shiny R sur localhost:3838)
+#   appelle une API sur une autre origine (ex : localhost:8000), le navigateur
+#   vérifie d'abord si le serveur l'autorise via des en-têtes HTTP spéciaux.
+#
+#   FastAPI intègre le middleware CORS de Starlette. Il suffit de l'ajouter
+#   avec app.add_middleware() avant de déclarer les routes.
+#
+#   Paramètres importants :
+#     - allow_origins      : liste des origines autorisées (["*"] = tout autoriser)
+#     - allow_credentials  : autoriser les cookies et les en-têtes d'authentification
+#     - allow_methods      : méthodes HTTP autorisées (["*"] = toutes)
+#     - allow_headers      : en-têtes HTTP autorisés dans les requêtes cross-origin
+#
+#   En développement, ["*"] est pratique. En production, spécifier les origines
+#   exactes (ex : ["https://myapp.example.com"]) pour limiter les accès.
+#
+#   Doc : https://fastapi.tiangolo.com/tutorial/cors/
+# =============================================================================
+
+app.add_middleware(
+    CORSMiddleware,
+    # Les origines sont lues depuis la configuration (variable CORS_ORIGINS).
+    # Par défaut "*" pour autoriser tout (utile en dev/démo).
+    allow_origins=settings.cors_origins_list,
+    # allow_credentials=True autoriserait les cookies et les en-têtes Authorization.
+    # On le désactive car cette API mock ne gère pas d'authentification.
+    allow_credentials=False,
+    # Autoriser toutes les méthodes HTTP (GET, POST, OPTIONS, etc.)
+    allow_methods=["*"],
+    # Autoriser tous les en-têtes HTTP
+    allow_headers=["*"],
 )
 
 
