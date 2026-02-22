@@ -19,5 +19,8 @@ pytest==8.3.5
 # Plugin pytest pour les coroutines async (utile avec httpx)
 pytest-asyncio==0.25.3
 
+# Gestion de la configuration via variables d'environnement (étape 7)
+pydantic-settings==2.8.1
+
 # Linter et formateur de code
 ruff==0.9.6

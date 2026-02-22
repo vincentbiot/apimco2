@@ -1,0 +1,53 @@
+# =============================================================================
+# .dockerignore — Fichiers exclus du contexte de build Docker
+#
+# Quand Docker construit une image, il envoie tout le répertoire courant
+# au daemon Docker (le "build context"). Le .dockerignore liste les fichiers
+# et répertoires à NE PAS envoyer.
+#
+# Avantages :
+#   - Build plus rapide (moins de données à transférer)
+#   - Image plus propre (pas de fichiers inutiles)
+#   - Sécurité : les fichiers sensibles (.env) ne sont pas inclus par accident
+# =============================================================================
+
+# Environnements Python virtuels (peuvent être très volumineux)
+.venv/
+venv/
+env/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+
+# Fichier de configuration locale — NE JAMAIS inclure dans l'image !
+# Les variables d'environnement sont passées via docker-compose ou docker run.
+.env
+
+# Tests — non nécessaires dans l'image de production
+tests/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Documentation et fichiers de projet
+docs/
+*.md
+CLAUDE.md
+
+# Fichiers git
+.git/
+.gitignore
+
+# Outils de développement
+.ruff_cache/
+
+# IDE et éditeurs
+.vscode/
+.idea/
+*.swp
+*.swo
